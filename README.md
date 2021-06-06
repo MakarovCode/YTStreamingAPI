@@ -12,11 +12,15 @@ gem 'YTStreamingAPI'
 
 And then execute:
 
-$ bundle
+```ruby
+bundle
+```
 
 Or install it yourself as:
 
-$ gem install YTStreamingAPI
+```ruby
+gem install YTStreamingAPI
+```
 
 ## Usage
 
