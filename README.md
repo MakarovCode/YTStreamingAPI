@@ -1,55 +1,94 @@
-# FrmMercury
+# YTStreamingAPI
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/frm_mercury`. To experiment with that code, run `bin/console` for an interactive prompt.
-
-TODO: Delete this and the text above, and describe your gem
+Ruby gem to use the YouTube Streaming API simple
 
 ## Installation
 
 Add this line to your application's Gemfile:
 
 ```ruby
-gem 'frm_mercury'
+gem 'YTStreamingAPI'
 ```
 
 And then execute:
 
-    $ bundle
+$ bundle
 
 Or install it yourself as:
 
-    $ gem install frm_mercury
+$ gem install YTStreamingAPI
 
 ## Usage
 
-First create an frm_mercury.rb in yours config/initializers
+For Rails First create an yt_streaming_api.rb in yours config/initializers
 
 ```ruby
-require 'frm_mercury'
-FrmMercury.configure do |config|
-  config.api_key = "Your Api Key From Firebase console"
+require "YTStreamingAPI"
+
+YtStreamingApi::RApi.configure do |config|
+  config.api_key        = 'your api key'
+  config.client_id      = 'your client id'
+  config.client_secret  = 'your secret key'
+  config.redirect_uri   = 'callback url for login'
+  config.response_type  = 'code'
+  config.scope          = 'https://www.googleapis.com/auth/youtube'
+  config.access_type    = 'offline'
 end
 ```
 
-Then to send a message...
+## Create the needed fields to your user table
+
+Run the next migration if you are using Rails and a table users
+
 ```ruby
-FrmMercury::Sender.send("Device FCM token as String or many tokens as Array", "Some title", "Some body message", "sound.mp3 (Leave empty for default)", "Hash in case you want to send extra info (optional)")
+rails g migration add_yt_fields_to_users youtube_authorization_token youtube_access_token youtube_reset_token testing:boolean
 ```
 
-## Development
+## Authenticating with the client YouTube account
 
-After checking out the repo, run `bin/setup` to install dependencies. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+For Rails First create an yt_streaming_api.rb in yours config/initializers
 
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and tags, and push the `.gem` file to [rubygems.org](https://rubygems.org).
+```ruby
+# In your HTML you can init a Login object passing an ActiveRecord object of your users
+@login_api = YtStreamingApi::RApi::Login.new current_user
 
-## Contributing
+# With this you can know go to YouTube to authenticate your user.
+link_to "Authenticate with YouTube", @login_api.url
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/frm_mercury. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](http://contributor-covenant.org) code of conduct.
 
-## License
+# The authentication callback should have the next code, Init the Login object passing an ActiveRecord object of your users
+login_api = YtStreamingApi::RApi::Login.new current_user
+if login_api.is_valid_response(params)
+  # This will validate the response
+  login_api.process_response_params(params)
+  # This will consume the youtube api and retrieve the tokens needed for the user connection
+  login_api.get_tokens
+  # save in data base
+  current_user.save
+end
 
-The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
+# Once your user is authenticated with YouTube and you stored it tokens in database, then you can start using the next api methods.
 
-## Code of Conduct
+# Always ask for the tokens of the users because these are refreshed by YouTube every hour.
 
-Everyone interacting in the FrmMercury project’s codebases, issue trackers, chat rooms and mailing lists is expected to follow the [code of conduct](https://github.com/[USERNAME]/frm_mercury/blob/master/CODE_OF_CONDUCT.md).
+login_api = YtStreamingApi::RApi::Login.new user
+login_api.get_tokens
+user.save
+
+# List the active Broadcast of the user
+broadcast_api = YtStreamingApi::RApi::Broadcast.new user
+broadcast_res = broadcast_api.list
+
+# How the get a ChatId for retrieveing messages
+chat_id = nil
+unless broadcast_res["items"].blank?
+  if broadcast_res["items"].any?
+    chat_id = broadcast_res["items"][0]["snippet"]["liveChatId"]
+  end
+end
+
+# Get the last 2000 records of the live chat with the retrieved ID
+messages_api = YtStreamingApi::RApi::Message.new user
+res = messages_api.list("snippet", 2000, chat_id)
+
+```
